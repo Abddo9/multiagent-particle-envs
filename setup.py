@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-setup(name='multiagent_particle_envs',
+setup(name='mpe',
       version='0.0.1',
       description='Multi-Agent Goal-Driven Communication Environment',
       url='https://github.com/Abddo9/multiagent-particle-envs',
