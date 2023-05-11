@@ -6,8 +6,8 @@ adversary to goal. Adversary is rewarded for its distance to the goal.
 
 
 import numpy as np
-from multiagent.core import World, Agent, Landmark
-from multiagent.scenario import BaseScenario
+from onpolicy.envs.mpe.core import World, Agent, Landmark
+from onpolicy.envs.mpe.scenario import BaseScenario
 import random
 
 
@@ -18,12 +18,12 @@ class CryptoAgent(Agent):
 
 class Scenario(BaseScenario):
 
-    def make_world(self):
+    def make_world(self,args):
         world = World()
         # set any world properties first
-        num_agents = 3
+        num_agents = args.num_agents#3
         num_adversaries = 1
-        num_landmarks = 2
+        num_landmarks = args.num_landmarks#2
         world.dim_c = 4
         # add agents
         world.agents = [CryptoAgent() for i in range(num_agents)]
@@ -46,7 +46,7 @@ class Scenario(BaseScenario):
 
     def reset_world(self, world):
         # random properties for agents
-        for i, agent in enumerate(world.agents):
+        for agent in world.agents:
             agent.color = np.array([0.25, 0.25, 0.25])
             if agent.adversary:
                 agent.color = np.array([0.75, 0.25, 0.25])
@@ -127,6 +127,8 @@ class Scenario(BaseScenario):
         if agent.goal_a is not None:
             goal_color = agent.goal_a.color
 
+        #print('goal color in obs is {}'.format(goal_color))
+
         # get positions of all entities in this agent's reference frame
         entity_pos = []
         for entity in world.landmarks:
@@ -146,7 +148,7 @@ class Scenario(BaseScenario):
         else:
             key = world.agents[2].key
 
-        prnt = False
+        prnt = False#True  if train use False
         # speaker
         if agent.speaker:
             if prnt:

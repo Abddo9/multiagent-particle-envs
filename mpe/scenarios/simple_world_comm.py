@@ -1,18 +1,17 @@
 import numpy as np
-from multiagent.core import World, Agent, Landmark
-from multiagent.scenario import BaseScenario
-
+from onpolicy.envs.mpe.core import World, Agent, Landmark
+from onpolicy.envs.mpe.scenario import BaseScenario
 
 class Scenario(BaseScenario):
-    def make_world(self):
+    def make_world(self,args):
         world = World()
         # set any world properties first
         world.dim_c = 4
         #world.damping = 1
-        num_good_agents = 2
-        num_adversaries = 4
+        num_good_agents = args.num_good_agents#2
+        num_adversaries = args.num_adversaries#4
         num_agents = num_adversaries + num_good_agents
-        num_landmarks = 1
+        num_landmarks = args.num_landmarks#1
         num_food = 2
         num_forests = 2
         # add agents
@@ -75,7 +74,7 @@ class Scenario(BaseScenario):
 
         for i, l in enumerate(boundary_list):
             l.name = 'boundary %d' % i
-            l.collide = True
+            l.collide == True
             l.movable = False
             l.boundary = True
             l.color = np.array([0.75, 0.75, 0.75])
@@ -103,13 +102,13 @@ class Scenario(BaseScenario):
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = np.random.uniform(-0.9, +0.9, world.dim_p)
+            landmark.state.p_pos = 0.8 * np.random.uniform(-1, +1, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
         for i, landmark in enumerate(world.food):
-            landmark.state.p_pos = np.random.uniform(-0.9, +0.9, world.dim_p)
+            landmark.state.p_pos = 0.8 * np.random.uniform(-1, +1, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
         for i, landmark in enumerate(world.forests):
-            landmark.state.p_pos = np.random.uniform(-0.9, +0.9, world.dim_p)
+            landmark.state.p_pos = 0.8 * np.random.uniform(-1, +1, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
     def benchmark_data(self, agent, world):
@@ -190,6 +189,8 @@ class Scenario(BaseScenario):
         adversaries = self.adversaries(world)
         if shape:
             rew -= 0.1 * min([np.sqrt(np.sum(np.square(a.state.p_pos - agent.state.p_pos))) for a in agents])
+            #for adv in adversaries:
+            #    rew -= 0.1 * min([np.sqrt(np.sum(np.square(a.state.p_pos - adv.state.p_pos))) for a in agents])
         if agent.collide:
             for ag in agents:
                 for adv in adversaries:
@@ -201,12 +202,12 @@ class Scenario(BaseScenario):
     def observation2(self, agent, world):
         # get positions of all entities in this agent's reference frame
         entity_pos = []
-        for entity in world.landmarks:
+        for entity in world.landmarks:  # world.entities:
             if not entity.boundary:
                 entity_pos.append(entity.state.p_pos - agent.state.p_pos)
 
         food_pos = []
-        for entity in world.food:
+        for entity in world.food:  # world.entities:
             if not entity.boundary:
                 food_pos.append(entity.state.p_pos - agent.state.p_pos)
         # communication of all other agents
@@ -285,5 +286,3 @@ class Scenario(BaseScenario):
                 [agent.state.p_vel] + [agent.state.p_pos] + entity_pos + other_pos + other_vel + in_forest + comm)
         else:
             return np.concatenate([agent.state.p_vel] + [agent.state.p_pos] + entity_pos + other_pos + in_forest + other_vel)
-
-

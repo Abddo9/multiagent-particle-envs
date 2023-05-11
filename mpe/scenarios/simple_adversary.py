@@ -1,15 +1,16 @@
 import numpy as np
-from multiagent.core import World, Agent, Landmark
-from multiagent.scenario import BaseScenario
+from onpolicy.envs.mpe.core import World, Agent, Landmark
+from onpolicy.envs.mpe.scenario import BaseScenario
+import random
 
 
 class Scenario(BaseScenario):
 
-    def make_world(self):
+    def make_world(self,args):
         world = World()
         # set any world properties first
         world.dim_c = 2
-        num_agents = 3
+        num_agents = args.num_agents#3
         world.num_agents = num_agents
         num_adversaries = 1
         num_landmarks = num_agents - 1
@@ -34,12 +35,9 @@ class Scenario(BaseScenario):
 
     def reset_world(self, world):
         # random properties for agents
-        world.agents[0].color = np.array([0.85, 0.35, 0.35])
-        for i in range(1, world.num_agents):
-            world.agents[i].color = np.array([0.35, 0.35, 0.85])
+        world.assign_agent_colors()
         # random properties for landmarks
-        for i, landmark in enumerate(world.landmarks):
-            landmark.color = np.array([0.15, 0.15, 0.15])
+        world.assign_landmark_colors()
         # set goal landmark
         goal = np.random.choice(world.landmarks)
         goal.color = np.array([0.15, 0.65, 0.15])

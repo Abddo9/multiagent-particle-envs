@@ -1,15 +1,21 @@
 import numpy as np
-from multiagent.core import World, Agent, Landmark
-from multiagent.scenario import BaseScenario
+from onpolicy.envs.mpe.core import World, Agent, Landmark
+from onpolicy.envs.mpe.scenario import BaseScenario
+import random
+
+#
+#     # the non-ensemble version of <ensemble_push>
+#
+#
 
 class Scenario(BaseScenario):
-    def make_world(self):
+    def make_world(self, args):
         world = World()
         # set any world properties first
         world.dim_c = 2
-        num_agents = 2
+        num_agents = args.num_agents#2
         num_adversaries = 1
-        num_landmarks = 2
+        num_landmarks = args.num_landmarks#2
         # add agents
         world.agents = [Agent() for i in range(num_agents)]
         for i, agent in enumerate(world.agents):
@@ -20,6 +26,8 @@ class Scenario(BaseScenario):
                 agent.adversary = True
             else:
                 agent.adversary = False
+            # agent.u_noise = 1e-1
+            # agent.c_noise = 1e-1
         # add landmarks
         world.landmarks = [Landmark() for i in range(num_landmarks)]
         for i, landmark in enumerate(world.landmarks):
@@ -52,7 +60,7 @@ class Scenario(BaseScenario):
             agent.state.p_vel = np.zeros(world.dim_p)
             agent.state.c = np.zeros(world.dim_c)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            landmark.state.p_pos = 0.8 * np.random.uniform(-1, +1, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
     def reward(self, agent, world):
