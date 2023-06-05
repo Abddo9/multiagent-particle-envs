@@ -3,6 +3,14 @@ from gym import spaces
 from gym.envs.registration import EnvSpec
 import numpy as np
 from .multi_discrete import MultiDiscrete
+from typing import List, Optional, Tuple, Callable
+import torch
+
+ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+VIEWER_MIN_ZOOM = 1.2
+X = 0
+Y = 1
+Z = 2
 
 # update bounds to center around agent
 cam_range = 2
@@ -33,6 +41,13 @@ class MultiAgentEnv(gym.Env):
         self.done_callback = done_callback
 
         self.post_step_callback = post_step_callback
+
+        self.render_geoms_xform = None
+        self.render_geoms = None
+        self.viewer = None
+        self.headless = None
+        self.visible_display = None
+        self.n_agents = len(self.agents)
 
         # environment parameters
         # self.discrete_action_space = True
@@ -285,6 +300,7 @@ class MultiAgentEnv(gym.Env):
                                 agent.name + ': ' + word + '   ')
             print(message)
 
+        print("len(self.viewers)", len(self.viewers))
         for i in range(len(self.viewers)):
             # create viewers (if necessary)
 
@@ -410,6 +426,159 @@ class MultiAgentEnv(gym.Env):
                 return_rgb_array=mode == 'rgb_array'))
 
         return results
+
+    def render2(
+        self,
+        mode="human",
+        env_index=0,
+        agent_index_focus: int = None,
+        visualize_when_rgb: bool = False,
+        plot_position_function: Callable[[Tuple[float, float]], float] = None,
+        plot_position_function_precision: float = 0.05,
+        plot_position_function_range: float = 1,
+            ):
+        """
+        Render function for environment using pyglet
+
+        On servers use mode="rgb_array" and set
+        ```
+        export DISPLAY=':99.0'
+        Xvfb :99 -screen 0 1400x900x24 > /dev/null 2>&1 &
+        ```
+
+        :param mode: One of human or rgb_array
+        :param env_index: Index of the environment to render
+        :param agent_index_focus: If specified the camera will stay on the agent with this index.
+                                  If None, the camera will stay in the center and zoom out to contain all agents
+        :param visualize_when_rgb: Also run human visualization when mode=="rgb_array"
+        :param plot_position_function: A function to plot under the rendering. This function takes
+         the position (x,y) as input and outputs a transparency alpha value
+        :param plot_position_function_precision: The precision to use for plotting the function
+        :param plot_position_function_range: The position range to plot the function in
+        :return: Rgb array or None, depending on the mode
+        """
+        assert (
+            mode in self.metadata["render.modes"]
+        ), f"Invalid mode {mode} received, allowed modes: {self.metadata['render.modes']}"
+        if agent_index_focus is not None:
+            assert 0 <= agent_index_focus < self.n_agents, (
+                f"Agent focus in rendering should be a valid agent index"
+                f" between 0 and {self.n_agents}, got {agent_index_focus}"
+            )
+        shared_viewer = agent_index_focus is None
+
+        headless = mode == "rgb_array" and not visualize_when_rgb
+        # First time rendering
+        if self.visible_display is None:
+            self.visible_display = not headless
+            self.headless = headless
+        # All other times headless should be the same
+        else:
+            assert self.visible_display is not headless
+
+        # First time rendering
+        if self.viewer is None:
+            try:
+                import pyglet
+            except ImportError:
+                raise ImportError(
+                    "Cannot import pyg;et: you can install pyglet directly via 'pip install pyglet'."
+                )
+
+            try:
+                pyglet.lib.load_library("EGL")
+            except ImportError:
+                self.headless = False
+            pyglet.options["headless"] = self.headless
+
+            from . import vmas_rendering
+
+            viewer_size = (700,700)
+            self.viewer = vmas_rendering.Viewer(
+            *viewer_size, visible=self.visible_display
+        )
+
+        # Render comm messages
+        if self.world.dim_c > 0:
+            idx = 0
+            for agent in self.world.agents:
+                if agent.silent:
+                    continue
+                assert (
+                    agent.state.c is not None
+                ), "Agent has no comm state but it should"
+                if self.continuous_actions:
+                    word = (
+                        "["
+                        + ",".join([f"{comm:.2f}" for comm in agent.state.c[env_index]])
+                        + "]"
+                    )
+                else:
+                    word = ALPHABET[torch.argmax(agent.state.c[env_index]).item()]
+
+                message = agent.name + " sends " + word + "   "
+                self.viewer.text_lines[idx].set_text(message)
+                idx += 1
+
+        zoom = max(VIEWER_MIN_ZOOM, VIEWER_MIN_ZOOM)
+
+        cam_range = torch.tensor([zoom, zoom])
+
+        if shared_viewer:
+            # zoom out to fit everyone
+            all_poses = torch.stack(
+                [torch.tensor(agent.state.p_pos) for agent in self.world.agents], dim=0
+            )
+            viewer_size_fit = (
+                torch.stack(
+                    [
+                        torch.max(torch.abs(all_poses[:,X])),
+                        torch.max(torch.abs(all_poses[:,Y])),
+                    ]
+                )
+                + zoom
+                - 1
+            )
+
+            viewer_size = torch.maximum(
+                viewer_size_fit / cam_range, torch.tensor(1)
+            )
+            cam_range *= torch.max(viewer_size)
+            self.viewer.set_bounds(
+                -cam_range[X],
+                cam_range[X],
+                -cam_range[Y],
+                cam_range[Y],
+            )
+        else:
+            # update bounds to center around agent
+            pos = self.agents[agent_index_focus].state.p_pos
+            self.viewer.set_bounds(
+                pos[X] - cam_range[X],
+                pos[X] + cam_range[X],
+                pos[Y] - cam_range[Y],
+                pos[Y] + cam_range[Y],
+            )
+
+        if plot_position_function is not None:
+            self.plot_function(
+                plot_position_function,
+                precision=plot_position_function_precision,
+                plot_range=plot_position_function_range,
+            )
+
+
+       # for geom in self.scenario.extra_render(env_index):
+        #    self.viewer.add_onetime(geom)
+
+        for entity in self.world.entities:
+            [
+                self.viewer.add_onetime(geom)
+                for geom in entity.render(env_index=env_index)
+            ]
+
+        # render to display or array
+        return self.viewer.render(return_rgb_array=mode == "rgb_array")
 
     # create receptor field locations in local coordinate frame
     def _make_receptor_locations(self, agent):

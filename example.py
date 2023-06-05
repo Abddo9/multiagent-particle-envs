@@ -69,12 +69,11 @@ def use_mpe_env(all_args, render: bool = False, save_render: bool = False):
     init_time = time.time()
     step = 0
 
+    obs = envs.reset()
     for s in range(n_steps):
         actions = []
         step += 1
         print(f"Step {step}")
-        
-        obs = envs.reset()
 
         for i in range(len(obs)):
             env_ac = []
@@ -87,8 +86,17 @@ def use_mpe_env(all_args, render: bool = False, save_render: bool = False):
         obs, rews, dones, info = envs.step(actions)
                         
         if render:       
-            img = envs.render(mode="rgb_array")      
-            frame_list.append(envs.render(mode="rgb_array")[0][0])  # Can give the camera an agent index to focus on
+            img = envs.render(mode="rgb_array", agent_index_focus=0,
+                        visualize_when_rgb=True,) 
+            print("img", img.shape) 
+            time.sleep(1)
+            img = envs.render(mode="rgb_array", agent_index_focus=1,
+                        visualize_when_rgb=True,)
+            time.sleep(1)
+            img = envs.render(mode="rgb_array", agent_index_focus=2,
+                        visualize_when_rgb=True,)
+            time.sleep(1)
+            frame_list.append(img[0])  # Can give the camera an agent index to focus on
 
     if render and save_render:
         import cv2

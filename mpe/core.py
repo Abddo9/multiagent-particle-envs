@@ -1,5 +1,6 @@
 import numpy as np
 import seaborn as sns
+import torch
 
 # physical/external base state of all entites
 class EntityState(object):
@@ -74,6 +75,23 @@ class Entity(object):
     @property
     def mass(self):
         return self.initial_mass
+    
+    def render(self, env_index: int = 0):
+        from . import vmas_rendering
+
+        geom = vmas_rendering.make_circle(self.size)
+        xform = vmas_rendering.Transform()
+        geom.add_attr(xform)
+
+        xform.set_translation(*self.state.p_pos)
+        xform.set_rotation(0)
+
+        color = self.color
+        if isinstance(color, torch.Tensor) and len(color.shape) > 1:
+            color = color[env_index]
+        geom.set_color(*color)
+
+        return [geom]
 
 # properties of landmark entities
 class Landmark(Entity):
